@@ -77,11 +77,10 @@
     const time = `<div class="t"><b>${L.n}</b>${esc(L.start)}<br>${esc(L.end)}</div>`;
     if (L.cancelled) {
       const was = L.was.length ? `<div class="was">${esc(titleOf(L.was))}</div>` : "";
-      return `<li class="les red">${time}<div class="w"><div class="ti">Урок скасаваны</div>${was}</div></li>`;
+      return `<li class="les red">${time}<div class="w"><div class="ti"><i class="dot"></i>Урок скасаваны</div>${was}</div></li>`;
     }
     const method = L.entries[0].method;
-    const tag = L.exchange ? `<span class="tag">замена</span>` : "";
-    return `<li class="les ${L.tone}">${time}<div class="w"><div class="ti">${method ? "Метадычны час" : esc(titleOf(L.entries))}${tag}</div>${meta(kind, L, L.entries)}</div></li>`;
+        return `<li class="les ${L.tone}">${time}<div class="w"><div class="ti"><i class="dot"></i>${method ? "Метадычны час" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
   }
   function entity(kind, id) {
     if (!(kind === "c" ? D.CLASSES[id] : D.TEACHERS[id])) { location.hash = "#/"; return; }
