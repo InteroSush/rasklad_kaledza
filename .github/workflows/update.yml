@@ -1,0 +1,59 @@
+name: Update schedule and deploy
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch latest schedule
+        id: fetch
+        run: python3 scripts/fetch_schedule.py
+
+      - name: Commit new data
+        if: steps.fetch.outputs.changed == 'true'
+        run: |
+          git config user.name "schedule-bot"
+          git config user.email "schedule-bot@users.noreply.github.com"
+          git add site/data/schedule.json
+          git commit -m "Update schedule"
+          git push
+
+      - name: Check if deploy is needed
+        id: need
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "${{ steps.fetch.outputs.changed }}" = "true" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/configure-pages@v5
+        if: steps.need.outputs.deploy == 'true'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.need.outputs.deploy == 'true'
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        id: deploy
+        if: steps.need.outputs.deploy == 'true'
+        uses: actions/deploy-pages@v4
