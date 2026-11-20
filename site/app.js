@@ -58,7 +58,8 @@
   function home() {
     const fv = favs().map(f => f.split(":")).filter(([k, id]) => (k === "c" ? D.CLASSES[id] : D.TEACHERS[id]));
     app.innerHTML = `
-      <header class="top"><h1>Расклад</h1><div class="sync">Абноўлена ${esc(D.EXPORT_DATE)} ${esc((D.EXPORT_TIME || "").slice(0, 5))}</div></header>
+      <header class="top"><div><h1>Расклад</h1><div class="sync">Абноўлена ${esc(D.EXPORT_DATE)} ${esc((D.EXPORT_TIME || "").slice(0, 5))}</div></div>
+        <button class="ico" data-a="menu" aria-label="Выгляд" title="Выгляд"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button></header>
       ${fv.length ? `<section class="sec"><h2>Мой расклад</h2><div class="chips">${fv.map(([k, id]) => `<button class="chip fav" data-a="open" data-k="${k}" data-id="${id}">${esc(S.name(k, id))}<small>${k === "c" ? "група" : "настаўнік"}</small></button>`).join("")}</div></section>` : ""}
       <div class="seg" role="tablist"><button role="tab" aria-selected="${st.tab === "c"}" data-a="tab" data-t="c">Групы</button><button role="tab" aria-selected="${st.tab === "t"}" data-a="tab" data-t="t">Настаўнікі</button></div>
       <input class="search" type="search" placeholder="${st.tab === "c" ? "Знайсці групу" : "Знайсці настаўніка"}" value="${esc(st.q)}" autocomplete="off">
@@ -105,6 +106,49 @@
       <div class="legend"><span style="--c:var(--ink)">звычайны</span><span style="--c:var(--yel)">мог змяніцца</span><span style="--c:var(--pur)">скасаваны</span><span style="--c:var(--org)">экзамен</span><span style="--c:var(--blue)">УПК</span></div>`;
   }
 
+  /* ---------- appearance menu ---------- */
+  const THEMES = [["sage", "Шалфей", "l"], ["sand", "Пясок", "l"], ["mist", "Туман", "l"], ["atrament", "Атрамант", "l"],
+    ["night", "Ноч", "d"], ["graphite", "Графіт", "d"], ["navy", "Мора", "d"], ["oled", "OLED", "d"]];
+  const FS = [85, 92, 100, 110, 120, 135, 150];
+  const menu = document.getElementById("menu"), root = document.documentElement;
+  const curTheme = () => { const t = store.get("theme", "auto"); return THEMES.some(x => x[0] === t) ? t : "auto"; };
+  const curFs = () => (FS.includes(store.get("fs", 100)) ? store.get("fs", 100) : 100);
+  function syncMeta() {
+    const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute("content", bg));
+  }
+  function applyTheme(t) { if (t === "auto") delete root.dataset.theme; else root.dataset.theme = t; syncMeta(); }
+  const thumb = ([id, name]) => `<button class="th${curTheme() === id ? " sel" : ""}" data-m="theme" data-t="${id}"><span class="sw" data-theme="${id}"><i class="l1"></i><i class="l2"></i><i class="dt"></i></span><span class="nm">${name}</span></button>`;
+  function menuHtml() {
+    const i = FS.indexOf(curFs());
+    return `<div class="ov" data-m="close"><div class="sheet" role="dialog" aria-label="Выгляд">
+      <div class="sh-h"><h2>Выгляд</h2><button class="ico" data-m="close" aria-label="Закрыць">✕</button></div>
+      <button class="auto${curTheme() === "auto" ? " sel" : ""}" data-m="theme" data-t="auto">Аўтаматычна <small>як на прыладзе</small></button>
+      <h3>Светлыя</h3><div class="grid">${THEMES.filter(t => t[2] === "l").map(thumb).join("")}</div>
+      <h3>Цёмныя</h3><div class="grid">${THEMES.filter(t => t[2] === "d").map(thumb).join("")}</div>
+      <h3>Памер шрыфта</h3><div class="fs"><button data-m="fs" data-d="-1" aria-label="Паменшыць" ${i <= 0 ? "disabled" : ""}>−</button><span>${FS[i]}%</span><button data-m="fs" data-d="1" aria-label="Павялічыць" ${i >= FS.length - 1 ? "disabled" : ""}>+</button></div>
+    </div></div>`;
+  }
+  function paintMenu() {
+    const y = (menu.querySelector(".sheet") || {}).scrollTop || 0;
+    menu.innerHTML = menuHtml(); menu.querySelector(".sheet").scrollTop = y;
+  }
+  const openMenu = () => paintMenu();
+  const closeMenu = () => { menu.innerHTML = ""; };
+  menu.addEventListener("click", e => {
+    const b = e.target.closest("[data-m]"); if (!b) return;
+    const m = b.dataset.m;
+    if (m === "close") { if (b.classList.contains("ov") && e.target !== b) return; closeMenu(); }
+    else if (m === "theme") { store.set("theme", b.dataset.t); applyTheme(b.dataset.t); paintMenu(); }
+    else if (m === "fs") {
+      const n = Math.min(FS.length - 1, Math.max(0, FS.indexOf(curFs()) + +b.dataset.d));
+      store.set("fs", FS[n]); root.style.fontSize = FS[n] + "%"; paintMenu();
+    }
+  });
+  addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncMeta);
+  applyTheme(curTheme()); root.style.fontSize = curFs() + "%";
+
   /* ---------- routing & events ---------- */
   function render() {
     if (!D) return;
@@ -121,6 +165,7 @@
     const b = e.target.closest("[data-a]"); if (!b) return;
     const a = b.dataset.a, m = location.hash.match(/^#\/([ct])\/(\w+)/);
     if (a === "retry") boot();
+    else if (a === "menu") openMenu();
     else if (a === "open") { st.date = null; location.hash = `#/${b.dataset.k}/${b.dataset.id}`; }
     else if (a === "back") { history.length > 1 ? history.back() : (location.hash = "#/"); }
     else if (a === "tab") { st.tab = b.dataset.t; st.q = ""; store.set("tab", st.tab); home(); }
