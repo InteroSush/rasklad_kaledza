@@ -187,5 +187,9 @@
   async function boot() { await load(); render(); }
   document.addEventListener("visibilitychange", async () => { if (!document.hidden && await load()) render(); });
   boot();
-  if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  if ("serviceWorker" in navigator) {
+    const had = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+    addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
 })();
