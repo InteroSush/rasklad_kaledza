@@ -76,12 +76,13 @@
     if (L.empty) return `<li class="gap">—</li>`;
     const time = `<div class="t"><b>${L.n}</b>${esc(L.start)}<br>${esc(L.end)}</div>`;
     if (L.cancelled) {
-      const was = L.was.length ? `<div class="was">${esc(titleOf(L.was))}</div>` : "";
-      return `<li class="les red">${time}<div class="w"><div class="ti"><i class="dot"></i>Урок скасаваны</div>${was}</div></li>`;
+      const was = L.was.length ? `<div class="mt was">${esc(titleOf(L.was))}</div>` : "";
+      return `<li class="les cancelled"><div class="t"><b>${L.n}</b></div><div class="w"><div class="ti"><i class="dot purple"></i>Урок скасаваны</div>${was}</div></li>`;
     }
     const method = L.entries[0].method;
-        return `<li class="les ${L.tone}">${time}<div class="w"><div class="ti"><i class="dot"></i>${method ? "Метадычны час" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
+        return `<li class="les ${L.tone}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычны час" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
   }
+  const marks = m => (m.exam || m.upk) ? `<span class="mk">${m.exam ? '<i class="orange"></i>' : ""}${m.upk ? '<i class="blue"></i>' : ""}</span>` : "";
   function entity(kind, id) {
     if (!(kind === "c" ? D.CLASSES[id] : D.TEACHERS[id])) { location.hash = "#/"; return; }
     st.date = st.date || startDate();
@@ -89,7 +90,7 @@
     const fav = favs().includes(kind + ":" + id);
     const strip = Array.from({ length: D.WEEKDAYNUM }, (_, i) => {
       const x = C.addDays(mon, i);
-      return `<button class="day${+x === +d ? " sel" : ""}${+x === +t0 ? " today" : ""}" data-a="goto" data-d="${+x}">${S.hasExchange(kind, id, x) ? "<i></i>" : ""}<span>${DS[i]}</span><b>${x.getUTCDate()}</b></button>`;
+      return `<button class="day${+x === +d ? " sel" : ""}${+x === +t0 ? " today" : ""}" data-a="goto" data-d="${+x}">${marks(S.day(kind, id, x).marks)}<span>${DS[i]}</span><b>${x.getUTCDate()}</b></button>`;
     }).join("");
     const body = r.vacation ? `<p class="empty">Канікулы або выхадны</p>`
       : !r.lessons.length ? `<p class="empty">${r.period ? "Няма заняткаў" : "На гэтую дату няма актыўнага раскладу"}</p>`
@@ -101,7 +102,7 @@
       <nav class="week"><button class="arr" data-a="week" data-n="-7" aria-label="Мінулы тыдзень">‹</button>${strip}<button class="arr" data-a="week" data-n="7" aria-label="Наступны тыдзень">›</button></nav>
       <div class="dh"><h2>${DAYS[C.dow(d) - 1][0].toUpperCase() + DAYS[C.dow(d) - 1].slice(1)}, ${d.getUTCDate()} ${MON[d.getUTCMonth()]}</h2>${+d !== +t0 ? `<button data-a="today">Сёння</button>` : ""}</div>
       ${body}
-      <div class="legend"><span style="--c:var(--ink)">звычайны</span><span style="--c:var(--red)">замена або адмена</span><span style="--c:var(--blue)">УПК</span></div>`;
+      <div class="legend"><span style="--c:var(--ink)">звычайны</span><span style="--c:var(--yel)">мог змяніцца</span><span style="--c:var(--pur)">скасаваны</span><span style="--c:var(--org)">экзамен</span><span style="--c:var(--blue)">УПК</span></div>`;
   }
 
   /* ---------- routing & events ---------- */

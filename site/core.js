@@ -10,6 +10,7 @@
   const dow = d => d.getUTCDay() || 7;
   const mondayOf = d => addDays(d, 1 - dow(d));
   const arr = v => (v == null ? [] : [].concat(v));
+  const isExam = n => /^экзамен/i.test(n || "");
   const clean = s => String(s || "").replace(/\s+/g, " ").trim();
 
   function nowIn(tz) {
@@ -53,11 +54,11 @@
     }
     const subj = id => D.SUBJECTS[id] || null;
     const classEntries = r => arr(r.s).map((s, i) => ({
-      subject: subj(s), blue: String(s)[0] === "u",
+      subject: subj(s), blue: String(s)[0] === "u", exam: isExam(subj(s)),
       teacher: r.t ? clean(D.TEACHERS[arr(r.t)[i]]) : "", room: r.r ? (D.ROOMS[arr(r.r)[i]] || "") : "",
       group: r.g && arr(r.g)[i] != null && D.CLASSGROUPS[arr(r.g)[i]] || "" }));
     const teacherEntries = r => r.s === "M" ? [{ method: true }] : [{
-      subject: subj(r.s), classes: arr(r.c).map(c => D.CLASSES[c]).join(", "),
+      subject: subj(r.s), exam: isExam(subj(r.s)), classes: arr(r.c).map(c => D.CLASSES[c]).join(", "),
       room: r.r ? (D.ROOMS[arr(r.r)[0]] || "") : "", group: arr(r.g).filter(g => g !== "-1" && g !== -1).map(g => D.CLASSGROUPS[g]).join(", ") }];
 
     function lesson(kind, id, info, n) {
@@ -66,13 +67,11 @@
       const e = ex && ex[n], b = base(isC ? D.CLASS_SCHEDULE : D.TEACH_SCHEDULE, info, id, n);
       const L = { n, tone: "ink", exchange: !!e, cancelled: false, entries: [], was: [] };
       if (e) {
-        L.tone = "red";
         if (arr(e.s)[0] === "F") { L.cancelled = true; if (b) L.was = entries(b); }
         else L.entries = entries(e);
-      } else if (b) {
-        L.entries = entries(b);
-        if (isC && L.entries.length === 1 && L.entries[0].blue) L.tone = "blue";
-      }
+      } else if (b) L.entries = entries(b);
+      const exam = L.entries.some(x => x.exam), upk = isC && L.entries.length === 1 && L.entries[0].blue;
+      L.tone = L.cancelled ? "purple" : exam ? "orange" : upk ? "blue" : L.exchange ? "yellow" : "ink";
       L.empty = !L.entries.length && !L.cancelled;
       const t = (D.LESSON_TIMES_BY_DAY && D.LESSON_TIMES_BY_DAY[info.daynum] || {})[n] || D.LESSON_TIMES[n] || [];
       L.start = t[0] || ""; L.end = t[1] || "";
@@ -83,12 +82,13 @@
       return !info.vacation && !!((kind === "c" ? D.CLASS_EXCHANGE : D.TEACH_EXCHANGE)[id] || {})[info.ds];
     }
     function day(kind, id, date) {
-      const info = dayInfo(date), out = { ...info, date, lessons: [], exchange: hasExchange(kind, id, date) };
+      const info = dayInfo(date), out = { ...info, date, lessons: [], marks: {}, exchange: hasExchange(kind, id, date) };
       if (info.vacation || info.off) return out;
       const all = [];
       for (let n = D.FIRSTLESSONNUM || 1; n <= D.LESSONSINDAY; n++) all.push(lesson(kind, id, info, n));
       const used = all.filter(l => !l.empty);
       if (used.length) out.lessons = all.slice(all.indexOf(used[0]), all.indexOf(used[used.length - 1]) + 1);
+      out.marks = { exam: out.lessons.some(l => l.tone === "orange"), upk: out.lessons.some(l => l.tone === "blue") };
       return out;
     }
     const nat = (a, b) => a.name.localeCompare(b.name, "ru", { numeric: true });
