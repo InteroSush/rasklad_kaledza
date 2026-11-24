@@ -76,7 +76,19 @@
   }
   let nowMin = null;   // minutes since midnight (college time zone) when viewing today, else null
   const hm = s => { const [h, m] = String(s).split(":").map(Number); return h * 60 + m; };
-  const nowCls = L => (nowMin !== null && !L.cancelled && !L.empty && L.start && nowMin >= hm(L.start) && nowMin < hm(L.end) ? " now" : "");
+  let nowL = null;
+  // The "current" lesson is highlighted from the end of the previous slot (the break) until its own end;
+  // the first lesson of the day is highlighted 10 minutes before it starts. Cancelled lessons are never highlighted.
+  function findNow(rows, min) {
+    for (let i = 0; i < rows.length; i++) {
+      const L = rows[i];
+      if (L.cancelled || L.empty || !L.start || !L.end) continue;
+      const p = rows[i - 1], from = p && p.end ? hm(p.end) : hm(L.start) - 10;
+      if (min >= from && min < hm(L.end)) return L;
+    }
+    return null;
+  }
+  const nowCls = L => (L === nowL ? " now" : "");
   function lessonHtml(kind, L) {
     if (L.info) return `<li class="les info${nowCls(L)}"><div class="t">${esc(L.start)}<br>${esc(L.end)}</div><div class="w"><div class="ti">${esc(L.text)}</div></div></li>`;
     if (L.empty) return `<li class="gap">—</li>`;
@@ -94,6 +106,7 @@
     st.date = st.date || startDate();
     const d = st.date, mon = C.mondayOf(d), nw = C.nowIn(TZ), t0 = nw.date, r = S.day(kind, id, d);
     nowMin = +d === +t0 ? nw.minutes : null;
+    nowL = nowMin === null ? null : findNow(r.lessons, nowMin);
     const fav = favs().includes(kind + ":" + id);
     const strip = Array.from({ length: D.WEEKDAYNUM }, (_, i) => {
       const x = C.addDays(mon, i);
