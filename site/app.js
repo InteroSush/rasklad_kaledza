@@ -74,8 +74,11 @@
     const multi = entries.length > 1;
     return entries.map(e => `<div class="mt">${esc((multi ? [e.group, e.teacher, e.room && "каб. " + e.room] : [e.teacher, e.room && "каб. " + e.room]).filter(Boolean).join(" · "))}</div>`).join("");
   }
+  let nowMin = null;   // minutes since midnight (college time zone) when viewing today, else null
+  const hm = s => { const [h, m] = String(s).split(":").map(Number); return h * 60 + m; };
+  const nowCls = L => (nowMin !== null && !L.cancelled && !L.empty && L.start && nowMin >= hm(L.start) && nowMin < hm(L.end) ? " now" : "");
   function lessonHtml(kind, L) {
-    if (L.info) return `<li class="les info"><div class="t">${esc(L.start)}<br>${esc(L.end)}</div><div class="w"><div class="ti">${esc(L.text)}</div></div></li>`;
+    if (L.info) return `<li class="les info${nowCls(L)}"><div class="t">${esc(L.start)}<br>${esc(L.end)}</div><div class="w"><div class="ti">${esc(L.text)}</div></div></li>`;
     if (L.empty) return `<li class="gap">—</li>`;
     const time = `<div class="t"><b>${L.n}</b>${esc(L.start)}<br>${esc(L.end)}</div>`;
     if (L.cancelled) {
@@ -83,13 +86,14 @@
       return `<li class="les cancelled"><div class="t"><b>${L.n}</b></div><div class="w"><div class="ti"><i class="dot purple"></i>Урок скасаваны</div>${was}</div></li>`;
     }
     const method = L.entries[0].method;
-        return `<li class="les ${L.tone}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычны час" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
+        return `<li class="les ${L.tone}${nowCls(L)}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычны час" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
   }
   const marks = m => (m.exam || m.upk) ? `<span class="mk">${m.exam ? '<i class="orange"></i>' : ""}${m.upk ? '<i class="blue"></i>' : ""}</span>` : "";
   function entity(kind, id) {
     if (!(kind === "c" ? D.CLASSES[id] : D.TEACHERS[id])) { location.hash = "#/"; return; }
     st.date = st.date || startDate();
-    const d = st.date, mon = C.mondayOf(d), t0 = today(), r = S.day(kind, id, d);
+    const d = st.date, mon = C.mondayOf(d), nw = C.nowIn(TZ), t0 = nw.date, r = S.day(kind, id, d);
+    nowMin = +d === +t0 ? nw.minutes : null;
     const fav = favs().includes(kind + ":" + id);
     const strip = Array.from({ length: D.WEEKDAYNUM }, (_, i) => {
       const x = C.addDays(mon, i);
@@ -187,7 +191,9 @@
   }, { passive: true });
 
   async function boot() { await load(); render(); }
-  document.addEventListener("visibilitychange", async () => { if (!document.hidden && await load()) render(); });
+  const inEntity = () => /^#\/[ct]\//.test(location.hash);
+  document.addEventListener("visibilitychange", async () => { if (!document.hidden) { const changed = await load(); if (changed || inEntity()) render(); } });
+  setInterval(() => { if (!document.hidden && D && inEntity()) render(); }, 60000);   // moves the "current lesson" highlight
   boot();
   if ("serviceWorker" in navigator) {
     const had = !!navigator.serviceWorker.controller; let reloaded = false;

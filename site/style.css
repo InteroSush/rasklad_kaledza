@@ -60,3 +60,4 @@ h1,h2{margin:0;font-weight:650;letter-spacing:-.01em}
 .fs{display:flex;align-items:center;gap:16px}.fs button{width:52px;height:52px;border:1px solid var(--line);border-radius:12px;font-size:1.5rem;line-height:1}.fs button:disabled{opacity:.35;cursor:default}
 .fs span{min-width:64px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
 .info{align-items:center}.info .ti{color:var(--mut);font-weight:500}
+.les.now{background:var(--accbg)}
