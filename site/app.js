@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const TZ = "Europe/Minsk";            // college time zone (used for "today" and the lesson clock)
-  const DATA_URL = "data/schedule.json";
+  const DATA_URL = "data/schedule.json", BELLS_URL = "data/bells.json";
   const C = ScheduleCore, app = document.getElementById("app");
   const DAYS = ["панядзелак", "аўторак", "серада", "чацвер", "пятніца", "субота", "нядзеля"];
   const DS = ["Пн", "Аў", "Ср", "Чц", "Пт", "Сб", "Нд"];
@@ -18,11 +18,12 @@
 
   async function load() {
     try {
-      const res = await fetch(DATA_URL, { cache: "no-cache" });
+      const [res, bres] = await Promise.all([fetch(DATA_URL, { cache: "no-cache" }), fetch(BELLS_URL, { cache: "no-cache" }).catch(() => null)]);
       if (!res.ok) throw new Error(res.status);
-      const text = await res.text();
-      if (text === raw) return false;
-      D = JSON.parse(text); raw = text; S = C.create(D); return true;
+      const text = await res.text(), btext = bres && bres.ok ? await bres.text() : "{}";
+      if (text + btext === raw) return false;
+      let bells = {}; try { bells = JSON.parse(btext); } catch {}
+      D = JSON.parse(text); raw = text + btext; S = C.create(D, bells); return true;
     } catch (e) {
       if (!D) app.innerHTML = `<p class="msg">Не атрымалася загрузіць расклад.<br><br><button class="chip" data-a="retry">Паўтарыць</button></p>`;
       return false;
@@ -74,6 +75,7 @@
     return entries.map(e => `<div class="mt">${esc((multi ? [e.group, e.teacher, e.room && "каб. " + e.room] : [e.teacher, e.room && "каб. " + e.room]).filter(Boolean).join(" · "))}</div>`).join("");
   }
   function lessonHtml(kind, L) {
+    if (L.info) return `<li class="les info"><div class="t">${esc(L.start)}<br>${esc(L.end)}</div><div class="w"><div class="ti">${esc(L.text)}</div></div></li>`;
     if (L.empty) return `<li class="gap">—</li>`;
     const time = `<div class="t"><b>${L.n}</b>${esc(L.start)}<br>${esc(L.end)}</div>`;
     if (L.cancelled) {

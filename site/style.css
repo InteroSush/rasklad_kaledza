@@ -59,3 +59,4 @@ h1,h2{margin:0;font-weight:650;letter-spacing:-.01em}
 .th.sel .sw{outline:2px solid var(--acc);outline-offset:2px}.nm{font-size:.78rem;color:var(--mut)}.th.sel .nm{color:var(--ink);font-weight:600}.th.sel .nm::before{content:"✓ "}
 .fs{display:flex;align-items:center;gap:16px}.fs button{width:52px;height:52px;border:1px solid var(--line);border-radius:12px;font-size:1.5rem;line-height:1}.fs button:disabled{opacity:.35;cursor:default}
 .fs span{min-width:64px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.info{align-items:center}.info .ti{color:var(--mut);font-weight:500}

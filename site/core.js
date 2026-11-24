@@ -19,7 +19,8 @@
     return { date: civil(+p.year, +p.month, +p.day), minutes: (+p.hour % 24) * 60 + +p.minute };
   }
 
-  function create(D) {
+  function create(D, bells) {
+    bells = bells || {};
     const periods = Object.entries(D.PERIODS || {}).map(([id, p]) => ({ id, b: parseDMY(p.b), e: parseDMY(p.e), fwm: p.fwm ? parseDMY(p.fwm) : null }));
     const pc = new Map();
     const getPeriod = d => {
@@ -73,7 +74,8 @@
       const exam = L.entries.some(x => x.exam), upk = isC && L.entries.length === 1 && L.entries[0].blue;
       L.tone = L.cancelled ? "purple" : exam ? "orange" : upk ? "blue" : L.exchange ? "yellow" : "ink";
       L.empty = !L.entries.length && !L.cancelled;
-      const t = (D.LESSON_TIMES_BY_DAY && D.LESSON_TIMES_BY_DAY[info.daynum] || {})[n] || D.LESSON_TIMES[n] || [];
+      const official = D.LESSON_TIMES_BY_DAY && D.LESSON_TIMES_BY_DAY[info.daynum], custom = (bells.times || {})[info.daynum];
+      const t = (official && official[n]) || (custom ? custom[n] : D.LESSON_TIMES[n]) || [];
       L.start = t[0] || ""; L.end = t[1] || "";
       return L;
     }
@@ -88,6 +90,11 @@
       for (let n = D.FIRSTLESSONNUM || 1; n <= D.LESSONSINDAY; n++) all.push(lesson(kind, id, info, n));
       const used = all.filter(l => !l.empty);
       if (used.length) out.lessons = all.slice(all.indexOf(used[0]), all.indexOf(used[used.length - 1]) + 1);
+      for (const x of bells.extras || []) {   // e.g. information hour between two lessons
+        const L = out.lessons;
+        if (x.day !== info.daynum || !L.length || !(L[0].n <= x.after && L[L.length - 1].n >= x.after + 1)) continue;
+        L.splice(L.findIndex(q => q.n === x.after) + 1, 0, { info: true, text: x.text, start: x.start, end: x.end, empty: false, entries: [], was: [], tone: "ink" });
+      }
       out.marks = { exam: out.lessons.some(l => l.tone === "orange"), upk: out.lessons.some(l => l.tone === "blue") };
       return out;
     }
