@@ -41,7 +41,11 @@ jobs:
       - name: Check if deploy is needed
         id: need
         run: |
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ steps.fetch.outputs.changed }}" = "true" ]; then
+          # Compare the live site's data with the repository's data: this also repairs a missed deploy.
+          live=$(curl -fsS "https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/data/schedule.json?t=$(date +%s)" | sha256sum | cut -d' ' -f1 || true)
+          mine=$(sha256sum site/data/schedule.json | cut -d' ' -f1)
+          echo "live=$live"; echo "repo=$mine"
+          if [ "${{ github.event_name }}" = "push" ] || [ "$live" != "$mine" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           else
             echo "deploy=false" >> "$GITHUB_OUTPUT"
