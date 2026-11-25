@@ -98,7 +98,7 @@
       return `<li class="les cancelled"><div class="t"><b>${L.n}</b></div><div class="w"><div class="ti"><i class="dot purple"></i>Урок скасаваны</div>${was}</div></li>`;
     }
     const method = L.entries[0].method;
-        return `<li class="les ${L.tone}${nowCls(L)}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычны час" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
+        return `<li class="les ${L.tone}${nowCls(L)}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычная гадзіна" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
   }
   const marks = m => (m.exam || m.upk) ? `<span class="mk">${m.exam ? '<i class="orange"></i>' : ""}${m.upk ? '<i class="blue"></i>' : ""}</span>` : "";
   function entity(kind, id) {
