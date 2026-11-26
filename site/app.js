@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const TZ = "Europe/Minsk";            // college time zone (used for "today" and the lesson clock)
-  const DATA_URL = "data/schedule.json", BELLS_URL = "data/bells.json";
+  const DATA_URL = "data/schedule.json", BELLS_URL = "data/bells.json", ROOMS_URL = "data/rooms.json";
   const C = ScheduleCore, app = document.getElementById("app");
   const DAYS = ["панядзелак", "аўторак", "серада", "чацвер", "пятніца", "субота", "нядзеля"];
   const DS = ["Пн", "Аў", "Ср", "Чц", "Пт", "Сб", "Нд"];
@@ -11,19 +11,21 @@
     get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
     set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
-  let D = null, S = null, raw = "";
+  let D = null, S = null, raw = "", roomCfg = {};
   const st = { tab: store.get("tab", "c"), q: "", date: null };
   const today = () => C.nowIn(TZ).date;
   const favs = () => store.get("fav", []);
 
   async function load() {
     try {
-      const [res, bres] = await Promise.all([fetch(DATA_URL, { cache: "no-cache" }), fetch(BELLS_URL, { cache: "no-cache" }).catch(() => null)]);
+      const opt = u => fetch(u, { cache: "no-cache" }).catch(() => null);
+      const [res, bres, rres] = await Promise.all([fetch(DATA_URL, { cache: "no-cache" }), opt(BELLS_URL), opt(ROOMS_URL)]);
       if (!res.ok) throw new Error(res.status);
-      const text = await res.text(), btext = bres && bres.ok ? await bres.text() : "{}";
-      if (text + btext === raw) return false;
+      const text = await res.text(), btext = bres && bres.ok ? await bres.text() : "{}", rtext = rres && rres.ok ? await rres.text() : "{}";
+      if (text + btext + rtext === raw) return false;
       let bells = {}; try { bells = JSON.parse(btext); } catch {}
-      D = JSON.parse(text); raw = text + btext; S = C.create(D, bells); return true;
+      try { roomCfg = JSON.parse(rtext); } catch { roomCfg = {}; }
+      D = JSON.parse(text); raw = text + btext + rtext; S = C.create(D, bells); return true;
     } catch (e) {
       if (!D) app.innerHTML = `<p class="msg">Не атрымалася загрузіць расклад.<br><br><button class="chip" data-a="retry">Паўтарыць</button></p>`;
       return false;
@@ -43,10 +45,24 @@
   /* ---------- home ---------- */
   function chip(kind, id, name, extra = "") {
     const f = favs().includes(kind + ":" + id);
-    return `<button class="chip${extra}" data-a="open" data-k="${kind}" data-id="${id}">${esc(name)}${f && !extra ? "" : ""}</button>`;
+    return `<button class="chip${extra}" data-a="open" data-k="${kind}" data-id="${esc(id)}">${esc(name)}</button>`;
+  }
+  function roomGroups() {
+    const cfg = roomCfg.groups || [], out = cfg.map(g => ({ name: g.name, rooms: [] })), rest = [];
+    for (const r of S.rooms) {
+      let i = cfg.findIndex(g => (g.rooms || []).includes(r));
+      if (i < 0) i = cfg.findIndex(g => g.pattern && new RegExp(g.pattern).test(r));
+      (i >= 0 ? out[i].rooms : rest).push(r);
+    }
+    if (rest.length) out.push({ name: roomCfg.undefined || "Ня вызначаныя", rooms: rest });
+    return out.filter(g => g.rooms.length);
   }
   function listHtml() {
     const q = st.q.trim().toLowerCase();
+    if (st.tab === "r") {
+      const gs = roomGroups().map(g => ({ ...g, rooms: g.rooms.filter(r => r.toLowerCase().includes(q)) })).filter(g => g.rooms.length);
+      return gs.length ? gs.map(g => `<div class="sec"><h2>${esc(g.name)}</h2><div class="chips">${g.rooms.map(r => chip("r", r, r)).join("")}</div></div>`).join("") : `<p class="empty">Кабінет не знойдзены</p>`;
+    }
     if (st.tab === "t") {
       const items = S.teachers.filter(t => t.name.toLowerCase().includes(q));
       return items.length ? `<ul class="tlist">${items.map(t => `<li><button data-a="open" data-k="t" data-id="${t.id}">${esc(t.name)}</button></li>`).join("")}</ul>` : `<p class="empty">Нікога не знойдзена</p>`;
@@ -57,22 +73,25 @@
     return courses.map(cr => `<div class="sec"><h2>${cr ? cr + " курс" : "Іншыя"}</h2><div class="chips">${items.filter(c => c.course === cr).map(c => chip("c", c.id, c.name)).join("")}</div></div>`).join("");
   }
   function home() {
-    const fv = favs().map(f => f.split(":")).filter(([k, id]) => (k === "c" ? D.CLASSES[id] : D.TEACHERS[id]));
+    const fv = favs().map(f => f.split(":")).filter(([k, id]) => S.exists(k, id));
     app.innerHTML = `
       <header class="top"><div><h1>Расклад</h1><div class="sync">Абноўлена ${esc(D.EXPORT_DATE)} ${esc((D.EXPORT_TIME || "").slice(0, 5))}</div></div>
-        <button class="ico" data-a="menu" aria-label="Выгляд" title="Выгляд"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button></header>
-      ${fv.length ? `<section class="sec"><h2>Мой расклад</h2><div class="chips">${fv.map(([k, id]) => `<button class="chip fav" data-a="open" data-k="${k}" data-id="${id}">${esc(S.name(k, id))}<small>${k === "c" ? "група" : "настаўнік"}</small></button>`).join("")}</div></section>` : ""}
-      <div class="seg" role="tablist"><button role="tab" aria-selected="${st.tab === "c"}" data-a="tab" data-t="c">Групы</button><button role="tab" aria-selected="${st.tab === "t"}" data-a="tab" data-t="t">Настаўнікі</button></div>
-      <input class="search" type="search" placeholder="${st.tab === "c" ? "Знайсці групу" : "Знайсці настаўніка"}" value="${esc(st.q)}" autocomplete="off">
+        <div class="btns"><button class="ico" data-a="tools" aria-label="Інструменты" title="Інструменты"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg></button>
+        <button class="ico" data-a="menu" aria-label="Выгляд" title="Выгляд"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button></div></header>
+      ${fv.length ? `<section class="sec"><h2>Мой расклад</h2><div class="chips">${fv.map(([k, id]) => `<button class="chip fav" data-a="open" data-k="${k}" data-id="${esc(id)}">${esc(S.name(k, id))}<small>${k === "c" ? "група" : k === "t" ? "настаўнік" : "кабінет"}</small></button>`).join("")}</div></section>` : ""}
+      <div class="seg" role="tablist"><button role="tab" aria-selected="${st.tab === "c"}" data-a="tab" data-t="c">Групы</button><button role="tab" aria-selected="${st.tab === "t"}" data-a="tab" data-t="t">Настаўнікі</button><button role="tab" aria-selected="${st.tab === "r"}" data-a="tab" data-t="r">Кабінеты</button></div>
+      <input class="search" type="search" placeholder="${{ c: "Знайсці групу", t: "Знайсці настаўніка", r: "Знайсці кабінет" }[st.tab] || ""}" value="${esc(st.q)}" autocomplete="off">
       <div id="list">${listHtml()}</div>`;
   }
 
   /* ---------- schedule ---------- */
   const titleOf = es => es.map(e => e.subject || "Урок скасаваны").filter((s, i, a) => s !== a[i - 1]).join(" / ");
-  function meta(kind, L, entries, cls = "") {
-    if (kind === "t") return entries.map(e => e.method ? "" : `<div class="mt">${esc([e.classes, e.group, e.room && "каб. " + e.room].filter(Boolean).join(" · "))}</div>`).join("");
+  const roomLink = r => (r ? `<a class="rl" href="#/r/${encodeURIComponent(r)}">каб. ${esc(r)}</a>` : "");
+  function meta(kind, L, entries) {
+    const line = parts => `<div class="mt">${parts.filter(Boolean).join(" · ")}</div>`;
+    if (kind === "t") return entries.map(e => (e.method ? "" : line([esc(e.classes), esc(e.group), roomLink(e.room)]))).join("");
     const multi = entries.length > 1;
-    return entries.map(e => `<div class="mt">${esc((multi ? [e.group, e.teacher, e.room && "каб. " + e.room] : [e.teacher, e.room && "каб. " + e.room]).filter(Boolean).join(" · "))}</div>`).join("");
+    return entries.map(e => line(multi ? [esc(e.group), esc(e.teacher), roomLink(e.room)] : [esc(e.teacher), roomLink(e.room)])).join("");
   }
   let nowMin = null;   // minutes since midnight (college time zone) when viewing today, else null
   const hm = s => { const [h, m] = String(s).split(":").map(Number); return h * 60 + m; };
@@ -100,27 +119,36 @@
     const method = L.entries[0].method;
         return `<li class="les ${L.tone}${nowCls(L)}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычная гадзіна" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
   }
+  // Room schedule row: top line = group · teacher, bottom line = subject; free slots say "Вольны"
+  function roomRow(L) {
+    const time = `<div class="t"><b>${L.n}</b>${esc(L.start)}<br>${esc(L.end)}</div>`;
+    if (L.free) return `<li class="les free">${time}<div class="w"><div class="ti">Вольны</div></div></li>`;
+    const items = L.items.map(i => `<div class="it"><div class="ti"><i class="dot ${i.tone}"></i>${esc([i.classes + (i.group ? " (" + i.group + ")" : ""), i.teacher].filter(Boolean).join(" · "))}</div><div class="mt">${esc(i.subject || "")}</div></div>`).join("");
+    return `<li class="les${nowCls(L)}">${time}<div class="w">${items}</div></li>`;
+  }
   const marks = m => (m.exam ? `<span class="mk"><i class="orange"></i></span>` : "");
   function entity(kind, id) {
-    if (!(kind === "c" ? D.CLASSES[id] : D.TEACHERS[id])) { location.hash = "#/"; return; }
+    if (!S.exists(kind, id)) { location.hash = "#/"; return; }
+    const get = (x) => (kind === "r" ? S.roomDay(id, x) : S.day(kind, id, x));
     st.date = st.date || startDate();
-    const d = st.date, mon = C.mondayOf(d), nw = C.nowIn(TZ), t0 = nw.date, r = S.day(kind, id, d);
+    const d = st.date, mon = C.mondayOf(d), nw = C.nowIn(TZ), t0 = nw.date, r = get(d);
     nowMin = +d === +t0 ? nw.minutes : null;
     nowL = nowMin === null ? null : findNow(r.lessons, nowMin);
     const fav = favs().includes(kind + ":" + id);
     const strip = Array.from({ length: D.WEEKDAYNUM }, (_, i) => {
       const x = C.addDays(mon, i);
-      return `<button class="day${+x === +d ? " sel" : ""}${+x === +t0 ? " today" : ""}" data-a="goto" data-d="${+x}">${marks(S.day(kind, id, x).marks)}<span>${DS[i]}</span><b>${x.getUTCDate()}</b></button>`;
+      return `<button class="day${+x === +d ? " sel" : ""}${+x === +t0 ? " today" : ""}" data-a="goto" data-d="${+x}">${marks(get(x).marks)}<span>${DS[i]}</span><b>${x.getUTCDate()}</b></button>`;
     }).join("");
     const body = r.vacation ? `<p class="empty">Канікулы або выхадны</p>`
       : !r.lessons.length ? `<p class="empty">${r.period ? "Няма заняткаў" : "На гэтую дату няма актыўнага раскладу"}</p>`
-      : `<ol class="les-list">${r.lessons.map(L => lessonHtml(kind, L)).join("")}</ol>`;
+      : `<ol class="les-list">${r.lessons.map(L => (kind === "r" ? roomRow(L) : lessonHtml(kind, L))).join("")}</ol>`;
     app.innerHTML = `
       <header class="bar"><button class="ico" data-a="back" aria-label="Назад">‹</button>
-        <div class="ttl"><h1>${kind === "c" ? "Група " : ""}${esc(S.name(kind, id))}</h1>${D.DUALWEEK && r.weekNum ? `<small>${r.weekNum === 1 ? "I" : "II"} тыдзень</small>` : ""}</div>
-        <button class="ico${fav ? " on" : ""}" data-a="fav" data-k="${kind}" data-id="${id}" aria-pressed="${fav}" aria-label="${fav ? "Прыбраць з галоўнай" : "Захаваць на галоўную"}" title="${fav ? "Прыбраць з галоўнай" : "Захаваць на галоўную"}">${fav ? "★" : "☆"}</button></header>
+        <div class="ttl"><h1>${kind === "c" ? "Група " : kind === "r" ? "Кабінет " : ""}${esc(S.name(kind, id))}</h1>${D.DUALWEEK && r.weekNum ? `<small>${r.weekNum === 1 ? "I" : "II"} тыдзень</small>` : ""}</div>
+        <button class="ico${fav ? " on" : ""}" data-a="fav" data-k="${kind}" data-id="${esc(id)}" aria-pressed="${fav}" aria-label="${fav ? "Прыбраць з галоўнай" : "Захаваць на галоўную"}" title="${fav ? "Прыбраць з галоўнай" : "Захаваць на галоўную"}">${fav ? "★" : "☆"}</button></header>
       <nav class="week"><button class="arr" data-a="week" data-n="-7" aria-label="Мінулы тыдзень">‹</button>${strip}<button class="arr" data-a="week" data-n="7" aria-label="Наступны тыдзень">›</button></nav>
       <div class="dh"><h2>${DAYS[C.dow(d) - 1][0].toUpperCase() + DAYS[C.dow(d) - 1].slice(1)}, ${d.getUTCDate()} ${MON[d.getUTCMonth()]}</h2>${+d !== +t0 ? `<button data-a="today">Сёння</button>` : ""}</div>
+      ${kind === "r" && r.lessons.length ? `<div class="occ">${r.lessons.map(L => `<span class="${L.free ? "" : "on"}" title="${L.free ? "вольны" : "заняты"}">${L.n}</span>`).join("")}</div>` : ""}
       ${body}
       <div class="legend"><span style="--c:var(--ink)">звычайны</span><span style="--c:var(--yel)">мог змяніцца</span><span style="--c:var(--pur)">скасаваны</span><span style="--c:var(--org)">экзамен</span></div>`;
   }
@@ -153,6 +181,11 @@
     menu.innerHTML = menuHtml(); menu.querySelector(".sheet").scrollTop = y;
   }
   const openMenu = () => paintMenu();
+  const openTools = () => {
+    menu.innerHTML = `<div class="ov" data-m="close"><div class="sheet" role="dialog" aria-label="Інструменты">
+      <div class="sh-h"><h2>Інструменты</h2><button class="ico" data-m="close" aria-label="Закрыць">✕</button></div>
+      <button class="tool" disabled>(У распрацоўцы)</button></div></div>`;
+  };
   const closeMenu = () => { menu.innerHTML = ""; };
   menu.addEventListener("click", e => {
     const b = e.target.closest("[data-m]"); if (!b) return;
@@ -171,8 +204,8 @@
   /* ---------- routing & events ---------- */
   function render() {
     if (!D) return;
-    const m = location.hash.match(/^#\/([ct])\/(\w+)/);
-    if (m) entity(m[1], m[2]); else { st.date = null; home(); }
+    const m = location.hash.match(/^#\/([ctr])\/(.+)$/);
+    if (m) entity(m[1], decodeURIComponent(m[2])); else { st.date = null; home(); }
     if (!m) window.scrollTo(0, 0);
   }
   addEventListener("hashchange", render);
@@ -182,10 +215,11 @@
   });
   app.addEventListener("click", e => {
     const b = e.target.closest("[data-a]"); if (!b) return;
-    const a = b.dataset.a, m = location.hash.match(/^#\/([ct])\/(\w+)/);
+    const a = b.dataset.a;
     if (a === "retry") boot();
     else if (a === "menu") openMenu();
-    else if (a === "open") { st.date = null; location.hash = `#/${b.dataset.k}/${b.dataset.id}`; }
+    else if (a === "tools") openTools();
+    else if (a === "open") { st.date = null; location.hash = `#/${b.dataset.k}/${encodeURIComponent(b.dataset.id)}`; }
     else if (a === "back") { history.length > 1 ? history.back() : (location.hash = "#/"); }
     else if (a === "tab") { st.tab = b.dataset.t; st.q = ""; store.set("tab", st.tab); home(); }
     else if (a === "goto") { st.date = new Date(+b.dataset.d); render(); }
@@ -204,7 +238,7 @@
   }, { passive: true });
 
   async function boot() { await load(); render(); }
-  const inEntity = () => /^#\/[ct]\//.test(location.hash);
+  const inEntity = () => /^#\/[ctr]\//.test(location.hash);
   document.addEventListener("visibilitychange", async () => { if (!document.hidden) { const changed = await load(); if (changed || inEntity()) render(); } });
   setInterval(() => { if (!document.hidden && D && inEntity()) render(); }, 60000);   // moves the "current lesson" highlight
   boot();

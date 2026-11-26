@@ -56,11 +56,11 @@
     const subj = id => D.SUBJECTS[id] || null;
     const classEntries = r => arr(r.s).map((s, i) => ({
       subject: subj(s), upk: subj(s) === "УПК", exam: isExam(subj(s)),
-      teacher: r.t ? clean(D.TEACHERS[arr(r.t)[i]]) : "", room: r.r ? (D.ROOMS[arr(r.r)[i]] || "") : "",
+      teacher: r.t ? clean(D.TEACHERS[arr(r.t)[i]]) : "", room: r.r ? clean(D.ROOMS[arr(r.r)[i]]) : "",
       group: r.g && arr(r.g)[i] != null && D.CLASSGROUPS[arr(r.g)[i]] || "" }));
     const teacherEntries = r => r.s === "M" ? [{ method: true }] : [{
       subject: subj(r.s), exam: isExam(subj(r.s)), classes: arr(r.c).map(c => D.CLASSES[c]).join(", "),
-      room: r.r ? (D.ROOMS[arr(r.r)[0]] || "") : "", group: arr(r.g).filter(g => g !== "-1" && g !== -1).map(g => D.CLASSGROUPS[g]).join(", ") }];
+      room: r.r ? clean(D.ROOMS[arr(r.r)[0]]) : "", group: arr(r.g).filter(g => g !== "-1" && g !== -1).map(g => D.CLASSGROUPS[g]).join(", ") }];
 
     function lesson(kind, id, info, n) {
       const isC = kind === "c", entries = isC ? classEntries : teacherEntries;
@@ -102,11 +102,47 @@
       return out;
     }
     const nat = (a, b) => a.name.localeCompare(b.name, "ru", { numeric: true });
+    // Rooms: an index built from every teacher's lesson (exchanges included); a cancelled lesson frees its room.
+    const rooms = [...new Set(Object.values(D.ROOMS || {}).map(clean).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
+    const rcache = new Map();
+    function roomIndex(date) {
+      if (rcache.has(+date)) return rcache.get(+date);
+      const idx = new Map();
+      for (const tid of Object.keys(D.TEACHERS)) {
+        for (const L of day("t", tid, date).lessons) {
+          if (L.info || L.empty || L.cancelled) continue;
+          for (const e of L.entries) {
+            if (e.method || !e.room) continue;
+            const m = idx.get(e.room) || {};
+            (m[L.n] = m[L.n] || []).push({ subject: e.subject, classes: e.classes, group: e.group, teacher: clean(D.TEACHERS[tid]), tone: L.tone });
+            idx.set(e.room, m);
+          }
+        }
+      }
+      rcache.set(+date, idx);
+      return idx;
+    }
+    function roomDay(name, date) {
+      const info = dayInfo(date), out = { ...info, date, lessons: [], marks: {} };
+      if (info.vacation || info.off || !info.period) return out;
+      const m = roomIndex(date).get(name) || {};
+      const official = D.LESSON_TIMES_BY_DAY && D.LESSON_TIMES_BY_DAY[info.daynum], custom = (bells.times || {})[info.daynum];
+      for (let n = D.FIRSTLESSONNUM || 1; n <= D.LESSONSINDAY; n++) {
+        if (custom && !custom[n] && !(official && official[n])) continue;   // no such lesson slot on this weekday
+        const t = (official && official[n]) || (custom ? custom[n] : D.LESSON_TIMES[n]) || [];
+        const items = m[n] || [];
+        out.lessons.push({ n, start: t[0] || "", end: t[1] || "", items, free: !items.length, empty: !items.length, cancelled: false,
+          tone: items.some(i => i.tone === "orange") ? "orange" : items.some(i => i.tone === "yellow") ? "yellow" : "ink" });
+      }
+      out.marks = { exam: out.lessons.some(l => l.tone === "orange") };
+      return out;
+    }
     return {
-      day, hasExchange,
+      day, hasExchange, roomDay, rooms,
+      exists: (kind, id) => kind === "c" ? !!D.CLASSES[id] : kind === "t" ? !!D.TEACHERS[id] : rooms.includes(id),
       classes: Object.entries(D.CLASSES).map(([id, name]) => ({ id, name, course: (D.CLASS_COURSES || {})[id] || "" })).sort(nat),
       teachers: Object.entries(D.TEACHERS).map(([id, n]) => ({ id, name: clean(n) })).sort(nat),
-      name: (kind, id) => kind === "c" ? D.CLASSES[id] : clean(D.TEACHERS[id]),
+      name: (kind, id) => kind === "c" ? D.CLASSES[id] : kind === "t" ? clean(D.TEACHERS[id]) : id,
     };
   }
   root.ScheduleCore = { create, civil, fmt, addDays, dow, mondayOf, nowIn };
