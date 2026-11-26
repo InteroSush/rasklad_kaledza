@@ -100,7 +100,7 @@
     const method = L.entries[0].method;
         return `<li class="les ${L.tone}${nowCls(L)}">${time}<div class="w"><div class="ti"><i class="dot ${L.tone}"></i>${method ? "Метадычная гадзіна" : esc(titleOf(L.entries))}</div>${meta(kind, L, L.entries)}</div></li>`;
   }
-  const marks = m => (m.exam || m.upk) ? `<span class="mk">${m.exam ? '<i class="orange"></i>' : ""}${m.upk ? '<i class="blue"></i>' : ""}</span>` : "";
+  const marks = m => (m.exam ? `<span class="mk"><i class="orange"></i></span>` : "");
   function entity(kind, id) {
     if (!(kind === "c" ? D.CLASSES[id] : D.TEACHERS[id])) { location.hash = "#/"; return; }
     st.date = st.date || startDate();
@@ -122,7 +122,7 @@
       <nav class="week"><button class="arr" data-a="week" data-n="-7" aria-label="Мінулы тыдзень">‹</button>${strip}<button class="arr" data-a="week" data-n="7" aria-label="Наступны тыдзень">›</button></nav>
       <div class="dh"><h2>${DAYS[C.dow(d) - 1][0].toUpperCase() + DAYS[C.dow(d) - 1].slice(1)}, ${d.getUTCDate()} ${MON[d.getUTCMonth()]}</h2>${+d !== +t0 ? `<button data-a="today">Сёння</button>` : ""}</div>
       ${body}
-      <div class="legend"><span style="--c:var(--ink)">звычайны</span><span style="--c:var(--yel)">мог змяніцца</span><span style="--c:var(--pur)">скасаваны</span><span style="--c:var(--org)">экзамен</span><span style="--c:var(--blue)">УПК</span></div>`;
+      <div class="legend"><span style="--c:var(--ink)">звычайны</span><span style="--c:var(--yel)">мог змяніцца</span><span style="--c:var(--pur)">скасаваны</span><span style="--c:var(--org)">экзамен</span></div>`;
   }
 
   /* ---------- appearance menu ---------- */

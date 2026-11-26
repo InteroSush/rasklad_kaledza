@@ -55,7 +55,7 @@
     }
     const subj = id => D.SUBJECTS[id] || null;
     const classEntries = r => arr(r.s).map((s, i) => ({
-      subject: subj(s), blue: String(s)[0] === "u", exam: isExam(subj(s)),
+      subject: subj(s), upk: subj(s) === "УПК", exam: isExam(subj(s)),
       teacher: r.t ? clean(D.TEACHERS[arr(r.t)[i]]) : "", room: r.r ? (D.ROOMS[arr(r.r)[i]] || "") : "",
       group: r.g && arr(r.g)[i] != null && D.CLASSGROUPS[arr(r.g)[i]] || "" }));
     const teacherEntries = r => r.s === "M" ? [{ method: true }] : [{
@@ -71,8 +71,11 @@
         if (arr(e.s)[0] === "F") { L.cancelled = true; if (b) L.was = entries(b); }
         else L.entries = entries(e);
       } else if (b) L.entries = entries(b);
-      const exam = L.entries.some(x => x.exam), upk = isC && L.entries.length === 1 && L.entries[0].blue;
-      L.tone = L.cancelled ? "purple" : exam ? "orange" : upk ? "blue" : L.exchange ? "yellow" : "ink";
+      // "УПК" is only a filler used by the timetable author: pretend such lessons do not exist
+      const allUpk = es => es.length > 0 && es.every(x => x.upk);
+      if (allUpk(L.entries) || (L.cancelled && allUpk(L.was))) { L.entries = []; L.was = []; L.cancelled = false; L.exchange = false; }
+      const exam = L.entries.some(x => x.exam);
+      L.tone = L.cancelled ? "purple" : exam ? "orange" : L.exchange ? "yellow" : "ink";
       L.empty = !L.entries.length && !L.cancelled;
       const official = D.LESSON_TIMES_BY_DAY && D.LESSON_TIMES_BY_DAY[info.daynum], custom = (bells.times || {})[info.daynum];
       const t = (official && official[n]) || (custom ? custom[n] : D.LESSON_TIMES[n]) || [];
@@ -95,7 +98,7 @@
         if (x.day !== info.daynum || !L.length || !(L[0].n <= x.after && L[L.length - 1].n >= x.after + 1)) continue;
         L.splice(L.findIndex(q => q.n === x.after) + 1, 0, { info: true, text: x.text, start: x.start, end: x.end, empty: false, entries: [], was: [], tone: "ink" });
       }
-      out.marks = { exam: out.lessons.some(l => l.tone === "orange"), upk: out.lessons.some(l => l.tone === "blue") };
+      out.marks = { exam: out.lessons.some(l => l.tone === "orange") };
       return out;
     }
     const nat = (a, b) => a.name.localeCompare(b.name, "ru", { numeric: true });
