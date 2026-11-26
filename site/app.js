@@ -184,12 +184,14 @@
   const openTools = () => {
     menu.innerHTML = `<div class="ov" data-m="close"><div class="sheet" role="dialog" aria-label="Інструменты">
       <div class="sh-h"><h2>Інструменты</h2><button class="ico" data-m="close" aria-label="Закрыць">✕</button></div>
-      <button class="tool" disabled>(У распрацоўцы)</button></div></div>`;
+      <button class="tool" data-m="go" data-h="#/f/list">Вольныя - спіс <span>›</span></button>
+      <button class="tool" data-m="go" data-h="#/f/search">Вольныя - пошук <span>›</span></button></div></div>`;
   };
   const closeMenu = () => { menu.innerHTML = ""; };
   menu.addEventListener("click", e => {
     const b = e.target.closest("[data-m]"); if (!b) return;
     const m = b.dataset.m;
+    if (m === "go") { closeMenu(); location.hash = b.dataset.h; return; }
     if (m === "close") { if (b.classList.contains("ov") && e.target !== b) return; closeMenu(); }
     else if (m === "theme") { store.set("theme", b.dataset.t); applyTheme(b.dataset.t); paintMenu(); }
     else if (m === "fs") {
@@ -201,12 +203,58 @@
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncMeta);
   applyTheme(curTheme()); root.style.fontSize = curFs() + "%";
 
+  /* ---------- free rooms ---------- */
+  const fs = { sel: new Set(), bld: "all", cls: false };
+  const isClassroom = r => new RegExp(roomCfg.classroomPattern || "^\\d+\\D?$").test(r);
+  const dayTitle = d => { const w = DAYS[C.dow(d) - 1]; return `${w[0].toUpperCase() + w.slice(1)}, ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+  function freeHead(title, d, t0) {
+    const mon = C.mondayOf(d);
+    const strip = Array.from({ length: D.WEEKDAYNUM }, (_, i) => { const x = C.addDays(mon, i);
+      return `<button class="day${+x === +d ? " sel" : ""}${+x === +t0 ? " today" : ""}" data-a="goto" data-d="${+x}"><span>${DS[i]}</span><b>${x.getUTCDate()}</b></button>`; }).join("");
+    return `<header class="bar"><button class="ico" data-a="back" aria-label="Назад">‹</button><div class="ttl"><h1>${title}</h1></div></header>
+      <nav class="week"><button class="arr" data-a="week" data-n="-7" aria-label="Мінулы тыдзень">‹</button>${strip}<button class="arr" data-a="week" data-n="7" aria-label="Наступны тыдзень">›</button></nav>
+      <div class="dh"><h2>${dayTitle(d)}</h2>${+d !== +t0 ? `<button data-a="today">Сёння</button>` : ""}</div>`;
+  }
+  const roomHref = r => `#/r/${encodeURIComponent(r)}`;
+  const noSlots = fd => `<p class="empty">${fd.vacation ? "Канікулы або выхадны" : fd.period ? "Няма заняткаў" : "На гэтую дату няма актыўнага раскладу"}</p>`;
+  function freePage(kind) {
+    st.date = st.date || startDate();
+    const d = st.date, nw = C.nowIn(TZ), t0 = nw.date, fd = S.freeDay(d), groups = roomGroups();
+    nowMin = +d === +t0 ? nw.minutes : null; nowL = nowMin === null ? null : findNow(fd.slots, nowMin);
+    if (kind === "list") {
+      const rows = fd.slots.map(s => {
+        const gs = groups.map(g => ({ g, rs: g.rooms.filter(r => fd.free.get(r).has(s.n)) })).filter(x => x.rs.length);
+        const inner = gs.length ? gs.map(x => `<div class="fg"><div class="fl">${esc(x.g.name)}</div><div class="chs">${x.rs.map(r => `<a class="rc" href="${roomHref(r)}">${esc(r)}</a>`).join("")}</div></div>`).join("") : `<div class="mt">Вольных няма</div>`;
+        return `<li class="les${s === nowL ? " now" : ""}"><div class="t"><b>${s.n}</b>${esc(s.start)}<br>${esc(s.end)}</div><div class="w">${inner}</div></li>`;
+      }).join("");
+      app.innerHTML = freeHead("Вольныя - спіс", d, t0) + (fd.slots.length ? `<ol class="les-list">${rows}</ol><p class="nt">Вольныя па раскладзе: заняткі па-за раскладам не ўлічваюцца.</p>` : noSlots(fd));
+      return;
+    }
+    // search
+    const nums = store.get("nums", false), have = new Set(fd.slots.map(s => s.n));
+    const sel = [...fs.sel].filter(n => have.has(n));
+    const N = fd.slots.length;
+    const shown = groups.filter(g => fs.bld === "all" || g.name === fs.bld).map(g => ({
+      name: g.name, rooms: g.rooms.filter(r => (!fs.cls || isClassroom(r)) && sel.every(n => fd.free.get(r).has(n))) })).filter(g => g.rooms.length);
+    const cell = (r, s) => `<span class="cell${sel.includes(s.n) ? " s" : ""}">${fd.free.get(r).has(s.n) ? (nums ? `<b>${s.n}</b>` : `<i class="fd"></i>`) : `<i class="bd"></i>`}</span>`;
+    const head = !nums ? `<div class="frow fh"><span></span>${fd.slots.map(s => `<span class="hn${sel.includes(s.n) ? " s" : ""}">${s.n}</span>`).join("")}</div>` : "";
+    const body = shown.length ? shown.map(g => `${groups.length > 1 && fs.bld === "all" ? `<h3 class="gh">${esc(g.name)}</h3>` : ""}${g.rooms.map(r => `<div class="frow"><a class="rn" href="${roomHref(r)}">${esc(r)}</a>${fd.slots.map(s => cell(r, s)).join("")}</div>`).join("")}`).join("")
+      : `<p class="empty">${sel.length ? "Няма кабінетаў, вольных ва ўсе абраныя ўрокі" : "Кабінетаў не знойдзена"}</p>`;
+    app.innerHTML = freeHead("Вольныя - пошук", d, t0) + (!N ? noSlots(fd) : `<div class="fx" style="--n:${N}">
+      <div class="fsel">${fd.slots.map(s => `<button class="${sel.includes(s.n) ? "on" : ""}" data-a="fsel" data-n="${s.n}" aria-pressed="${sel.includes(s.n)}">${s.n}</button>`).join("")}</div>
+      <div class="seg2" role="group">${[["all", "Усе"], ...groups.map(g => [g.name, g.name.replace(/^На /, "")])].map(([v, n]) => `<button class="${fs.bld === v ? "on" : ""}" data-a="fb" data-b="${esc(v)}">${esc(n)}</button>`).join("")}</div>
+      <div class="acts"><button data-a="freset">Скід</button><button class="${fs.cls ? "on" : ""}" data-a="fcls" aria-pressed="${fs.cls}">Толькі класы</button><button class="${nums ? "on" : ""}" data-a="fnums" aria-pressed="${nums}">Лічбы</button></div>
+      <div class="ftab">${head}${body}</div></div>`);
+  }
+
   /* ---------- routing & events ---------- */
   function render() {
     if (!D) return;
     const m = location.hash.match(/^#\/([ctr])\/(.+)$/);
-    if (m) entity(m[1], decodeURIComponent(m[2])); else { st.date = null; home(); }
-    if (!m) window.scrollTo(0, 0);
+    const f = location.hash.match(/^#\/f\/(list|search)$/);
+    if (m) entity(m[1], decodeURIComponent(m[2]));
+    else if (f) freePage(f[1]); else { st.date = null; home(); }
+    if (!m && !f) window.scrollTo(0, 0);
   }
   addEventListener("hashchange", render);
   app.addEventListener("input", e => {
@@ -217,6 +265,11 @@
     const b = e.target.closest("[data-a]"); if (!b) return;
     const a = b.dataset.a;
     if (a === "retry") boot();
+    else if (a === "fsel") { const n = +b.dataset.n; fs.sel.has(n) ? fs.sel.delete(n) : fs.sel.add(n); render(); }
+    else if (a === "fb") { fs.bld = b.dataset.b; render(); }
+    else if (a === "fcls") { fs.cls = !fs.cls; render(); }
+    else if (a === "fnums") { store.set("nums", !store.get("nums", false)); render(); }
+    else if (a === "freset") { fs.sel.clear(); fs.cls = false; render(); }
     else if (a === "menu") openMenu();
     else if (a === "tools") openTools();
     else if (a === "open") { st.date = null; location.hash = `#/${b.dataset.k}/${encodeURIComponent(b.dataset.id)}`; }
@@ -238,7 +291,7 @@
   }, { passive: true });
 
   async function boot() { await load(); render(); }
-  const inEntity = () => /^#\/[ctr]\//.test(location.hash);
+  const inEntity = () => /^#\/([ctr]|f)\//.test(location.hash);
   document.addEventListener("visibilitychange", async () => { if (!document.hidden) { const changed = await load(); if (changed || inEntity()) render(); } });
   setInterval(() => { if (!document.hidden && D && inEntity()) render(); }, 60000);   // moves the "current lesson" highlight
   boot();

@@ -137,8 +137,29 @@
       out.marks = { exam: out.lessons.some(l => l.tone === "orange") };
       return out;
     }
+    function slotsFor(info) {
+      const official = D.LESSON_TIMES_BY_DAY && D.LESSON_TIMES_BY_DAY[info.daynum], custom = (bells.times || {})[info.daynum], out = [];
+      for (let n = D.FIRSTLESSONNUM || 1; n <= D.LESSONSINDAY; n++) {
+        if (custom && !custom[n] && !(official && official[n])) continue;
+        const t = (official && official[n]) || (custom ? custom[n] : D.LESSON_TIMES[n]) || [];
+        out.push({ n, start: t[0] || "", end: t[1] || "" });
+      }
+      return out;
+    }
+    // For one date: lesson slots and, for every room, the set of lesson numbers when it is free by the timetable.
+    function freeDay(date) {
+      const info = dayInfo(date), out = { ...info, date, slots: [], free: new Map() };
+      if (info.vacation || info.off || !info.period) return out;
+      out.slots = slotsFor(info);
+      const idx = roomIndex(date);
+      for (const r of rooms) {
+        const m = idx.get(r) || {};
+        out.free.set(r, new Set(out.slots.filter(s => !(m[s.n] && m[s.n].length)).map(s => s.n)));
+      }
+      return out;
+    }
     return {
-      day, hasExchange, roomDay, rooms,
+      day, hasExchange, roomDay, rooms, freeDay,
       exists: (kind, id) => kind === "c" ? !!D.CLASSES[id] : kind === "t" ? !!D.TEACHERS[id] : rooms.includes(id),
       classes: Object.entries(D.CLASSES).map(([id, name]) => ({ id, name, course: (D.CLASS_COURSES || {})[id] || "" })).sort(nat),
       teachers: Object.entries(D.TEACHERS).map(([id, n]) => ({ id, name: clean(n) })).sort(nat),

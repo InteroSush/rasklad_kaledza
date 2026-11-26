@@ -66,3 +66,17 @@ h1,h2{margin:0;font-weight:650;letter-spacing:-.01em}
 .free .ti{color:var(--mut);font-weight:400}.free .t b{color:var(--mut);font-weight:500}.it+.it{margin-top:8px}
 .occ{display:flex;gap:5px;padding:0 20px 12px}.occ span{flex:1;max-width:34px;text-align:center;font-size:.72rem;line-height:22px;border:1px solid var(--line);border-radius:6px;color:var(--mut)}
 .occ span.on{background:var(--acc);border-color:var(--acc);color:var(--sf);font-weight:600}
+.tool{justify-content:space-between;align-items:center}.tool span{color:var(--mut);font-size:1.3rem}
+.fg+.fg{margin-top:10px}.fl{font-size:.72rem;color:var(--mut);margin-bottom:5px}.chs{display:flex;flex-wrap:wrap;gap:6px}
+.rc{padding:3px 10px;border-radius:8px;background:var(--accbg);color:var(--ink);text-decoration:none;font-weight:600;font-size:.9rem}
+.nt{padding:12px 20px 28px;margin:0;color:var(--mut);font-size:.8rem}
+.fx{padding:0 20px 28px}.fsel{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:4px;margin-bottom:10px}
+.fsel button{height:42px;border:1px solid var(--line);border-radius:8px;color:var(--mut);font-size:.9rem}.fsel button.on{background:var(--acc);border-color:var(--acc);color:var(--sf);font-weight:600}
+.seg2{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:8px}.seg2 button{flex:1;padding:7px 0;font-size:.85rem;color:var(--mut)}.seg2 button.on{background:var(--accbg);color:var(--ink);font-weight:600}
+.acts{display:flex;gap:8px;margin-bottom:14px}.acts button{flex:1;padding:7px 0;font-size:.85rem;border:1px solid var(--line);border-radius:10px;color:var(--mut)}.acts button.on{background:var(--accbg);border-color:transparent;color:var(--ink);font-weight:600}
+.frow{display:grid;grid-template-columns:5em repeat(var(--n),1fr);align-items:center;margin-top:3px}
+.rn{font-weight:600;color:inherit;text-decoration:none;font-size:.95rem}.gh{margin:14px 0 2px;font-size:.78rem;color:var(--mut);font-weight:600}
+.cell{height:30px;display:grid;place-items:center;border-radius:8px}.cell.s,.hn.s{background:var(--accbg)}.cell b{font-size:.9rem;font-weight:650}
+.fd{width:12px;height:12px;border-radius:50%;background:var(--acc);display:block}.bd{width:8px;height:2px;border-radius:1px;background:var(--line);display:block}
+.fh{margin-top:0}.hn{text-align:center;font-size:.7rem;color:var(--mut);border-radius:8px 8px 0 0;line-height:20px}
+.les.now .rc{background:var(--sf)}
